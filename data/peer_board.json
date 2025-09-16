@@ -1,0 +1,83 @@
+{
+  "posts": [
+    {
+      "id": "1703123456789abc",
+      "title": "Best fertilizer for wheat crop in Punjab?",
+      "content": "I'm planning to grow wheat this season in Amritsar district. What fertilizer combination would you recommend for optimal yield? My soil pH is around 7.2.",
+      "category": "fertilizers",
+      "author": "FarmerRaj",
+      "type": "question",
+      "timestamp": "2024-01-15T10:30:00.000Z",
+      "answers": [
+        {
+          "id": "ans1703123456789def",
+          "content": "For wheat in Punjab with pH 7.2, I recommend NPK 20:10:10 at sowing, followed by urea top-dressing at tillering stage. Also consider adding DAP for phosphorus.",
+          "author": "AgroExpert",
+          "timestamp": "2024-01-15T14:20:00.000Z",
+          "likes": 5
+        },
+        {
+          "id": "ans1703123456789ghi",
+          "content": "I've been using organic compost mixed with vermicompost for my wheat fields. Results have been excellent with improved soil health.",
+          "author": "OrganicFarmer",
+          "timestamp": "2024-01-15T16:45:00.000Z",
+          "likes": 3
+        }
+      ],
+      "likes": 8,
+      "views": 124
+    },
+    {
+      "id": "1703223456789jkl",
+      "title": "Dealing with aphid infestation in mustard crop",
+      "content": "My mustard crop is showing signs of aphid attack. The leaves are curling and there's honeydew on the plants. What's the best treatment approach?",
+      "category": "pest-control",
+      "author": "GreenThumb",
+      "type": "question",
+      "timestamp": "2024-01-16T08:15:00.000Z",
+      "answers": [
+        {
+          "id": "ans1703223456789mno",
+          "content": "For aphids on mustard, spray neem oil solution (5ml per liter) early morning or evening. Also introduce ladybugs if possible - they're natural predators.",
+          "author": "IPMSpecialist",
+          "timestamp": "2024-01-16T10:30:00.000Z",
+          "likes": 7
+        }
+      ],
+      "likes": 6,
+      "views": 89
+    },
+    {
+      "id": "1703323456789pqr",
+      "title": "Tip: Crop rotation benefits for soil health",
+      "content": "After 5 years of practicing legume-cereal rotation (chickpea-wheat), I've noticed 20% improvement in soil organic matter and reduced fertilizer needs. Highly recommend this practice!",
+      "category": "soil-management",
+      "author": "SustainableFarmer",
+      "type": "tip",
+      "timestamp": "2024-01-17T12:00:00.000Z",
+      "answers": [],
+      "likes": 15,
+      "views": 203
+    },
+    {
+      "id": "1703423456789stu",
+      "title": "Weather impact on rice transplanting timing",
+      "content": "With changing monsoon patterns, when is the optimal time for rice transplanting in central Punjab? Should we wait for consistent rainfall or start with irrigation?",
+      "category": "weather",
+      "author": "RiceFarmer2024",
+      "type": "discussion",
+      "timestamp": "2024-01-18T07:45:00.000Z",
+      "answers": [
+        {
+          "id": "ans1703423456789vwx",
+          "content": "Based on meteorological data, mid-June to early July is still optimal. Don't wait too long for monsoon - start with irrigation if needed. Delayed transplanting reduces yield significantly.",
+          "author": "WeatherExpert",
+          "timestamp": "2024-01-18T09:20:00.000Z",
+          "likes": 4
+        }
+      ],
+      "likes": 9,
+      "views": 156
+    }
+  ]
+}
