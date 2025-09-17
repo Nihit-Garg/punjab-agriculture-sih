@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const imageController = require('../controllers/imageController');
+const { validateImageDetection, validateQueryParams } = require('../middleware/validation');
 
 // Configure multer for image uploads
 const storage = multer.diskStorage({
@@ -32,9 +33,15 @@ const upload = multer({
 router.post('/upload', upload.single('image'), imageController.uploadImage);
 
 // POST /api/images/detect - Analyze uploaded image for pest/disease detection
-router.post('/detect', imageController.detectPestDisease);
+router.post('/detect', validateImageDetection, imageController.detectPestDisease);
 
 // DELETE /api/images/:filename - Delete uploaded image
 router.delete('/:filename', imageController.deleteImage);
+
+// GET /api/images/history - Get recent image analyses
+router.get('/history', validateQueryParams, imageController.getAnalysisHistory);
+
+// GET /api/images/statistics - Get analysis statistics
+router.get('/statistics', imageController.getAnalysisStatistics);
 
 module.exports = router;

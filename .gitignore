@@ -11,6 +11,11 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Next.js build output
+.next/
+build/
+dist/
+
 # Uploads directory contents (but keep the directory)
 uploads/*
 !uploads/.gitkeep

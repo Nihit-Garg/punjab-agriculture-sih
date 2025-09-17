@@ -1,44 +1,47 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
-import pickle
 import os
-import random
 from datetime import datetime
+from models import PunjabCropPredictor
 
 app = Flask(__name__)
 CORS(app)
 
-# Global variable to store loaded models
-models = {}
+# Global variables
+predictor = None
+model_loaded = False
 
 def load_models():
-    """Load ML models (or create mock models if files don't exist)"""
+    """Load trained ML models"""
+    global predictor, model_loaded
+    
     try:
-        # Try to load actual model files
-        if os.path.exists('model.pkl'):
-            with open('model.pkl', 'rb') as f:
-                models['crop_recommendation'] = pickle.load(f)
-                models['yield_prediction'] = pickle.load(f)
+        if os.path.exists('./model/crop_recommender.pkl'):
+            print("📂 Loading trained Punjab crop models...")
+            predictor = PunjabCropPredictor()
+            predictor.load_models('./model')
+            model_loaded = True
+            print("✅ Models loaded successfully!")
         else:
-            # Create mock models for demonstration
-            print("Model files not found. Using mock models for demonstration.")
-            models['crop_recommendation'] = None
-            models['yield_prediction'] = None
+            print("⚠️ Model files not found. Using mock predictions.")
+            predictor = None
+            model_loaded = False
     except Exception as e:
-        print(f"Error loading models: {e}")
-        models['crop_recommendation'] = None
-        models['yield_prediction'] = None
+        print(f"❌ Error loading models: {e}")
+        predictor = None
+        model_loaded = False
 
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'OK',
-        'service': 'Agriculture ML Microservice',
-        'version': '1.0.0',
+        'service': 'Punjab Agriculture ML Microservice',
+        'version': '2.0.0',
         'timestamp': datetime.now().isoformat(),
-        'models_loaded': len([m for m in models.values() if m is not None])
+        'models_loaded': model_loaded,
+        'model_type': 'PunjabCropPredictor' if model_loaded else 'Mock'
     })
 
 @app.route('/predict/crop-recommendation', methods=['POST'])
@@ -50,32 +53,60 @@ def predict_crop_recommendation():
         if not data:
             return jsonify({'error': 'No JSON data provided'}), 400
         
+        # Extract input data
         soil_data = data.get('soil_data', {})
         weather_data = data.get('weather_data', {})
         location = data.get('location', 'Unknown')
         
-        # Extract features from input data
-        features = extract_crop_features(soil_data, weather_data)
+        # Prepare soil data with defaults
+        processed_soil_data = {
+            'nitrogen': soil_data.get('nitrogen', 150),
+            'phosphorus': soil_data.get('phosphorus', 40),
+            'potassium': soil_data.get('potassium', 100),
+            'rainfall': weather_data.get('rainfall', 700),
+            'temperature': weather_data.get('temperature', 25),
+            'soil_type': soil_data.get('soil_type', 'loamy')
+        }
         
-        if models['crop_recommendation'] is None:
-            # Use mock prediction logic
-            recommendations = generate_mock_crop_recommendations(features, location)
+        if predictor and model_loaded:
+            # Use trained ML model
+            recommendations = predictor.get_crop_recommendations(processed_soil_data, location)
+            
+            # Get fertilizer recommendations for top crop
+            top_crop = recommendations[0]['crop'] if recommendations else 'wheat'
+            fertilizer_recs = predictor.get_fertilizer_recommendations(processed_soil_data, top_crop)
+            
+            # Get soil health analysis
+            soil_health = predictor.analyze_soil_health(processed_soil_data)
+            
+            return jsonify({
+                'success': True,
+                'recommendations': recommendations,
+                'fertilizer_recommendations': fertilizer_recs,
+                'soil_health': soil_health,
+                'location': location,
+                'input_data': processed_soil_data,
+                'timestamp': datetime.now().isoformat(),
+                'model_version': 'v2.0.0-punjab-trained'
+            })
         else:
-            # Use actual ML model
-            recommendations = predict_with_model(models['crop_recommendation'], features)
-        
-        return jsonify({
-            'success': True,
-            'recommendations': recommendations,
-            'location': location,
-            'analysis': analyze_conditions(features),
-            'timestamp': datetime.now().isoformat(),
-            'model_version': 'v1.0.0'
-        })
+            # Use mock predictions
+            mock_recommendations = generate_mock_crop_recommendations(processed_soil_data, location)
+            
+            return jsonify({
+                'success': True,
+                'recommendations': mock_recommendations,
+                'fertilizer_recommendations': [],
+                'soil_health': {'health_status': 'Average', 'recommendations': []},
+                'location': location,
+                'input_data': processed_soil_data,
+                'timestamp': datetime.now().isoformat(),
+                'model_version': 'v2.0.0-mock'
+            })
         
     except Exception as e:
         return jsonify({
-            'error': 'Prediction failed',
+            'error': 'Crop recommendation failed',
             'message': str(e)
         }), 500
 
@@ -88,30 +119,98 @@ def predict_yield():
         if not data:
             return jsonify({'error': 'No JSON data provided'}), 400
         
-        crop_type = data.get('crop_type', '')
+        crop_type = data.get('crop_type', 'wheat')
         soil_data = data.get('soil_data', {})
         weather_data = data.get('weather_data', {})
-        area = data.get('area', 1)
+        area = data.get('area', 1.0)
         location = data.get('location', 'Unknown')
         
-        # Extract features
-        features = extract_yield_features(crop_type, soil_data, weather_data, area)
+        # Prepare soil data
+        processed_soil_data = {
+            'nitrogen': soil_data.get('nitrogen', 150),
+            'phosphorus': soil_data.get('phosphorus', 40),
+            'potassium': soil_data.get('potassium', 100),
+            'rainfall': weather_data.get('rainfall', 700),
+            'temperature': weather_data.get('temperature', 25),
+            'soil_type': soil_data.get('soil_type', 'loamy')
+        }
         
-        if models['yield_prediction'] is None:
-            # Use mock prediction logic
-            prediction = generate_mock_yield_prediction(crop_type, features, area)
+        if predictor and model_loaded:
+            # Use trained ML model to get recommendations
+            recommendations = predictor.get_crop_recommendations(processed_soil_data, location)
+            
+            # Find the specific crop in recommendations or use first one
+            crop_prediction = None
+            for rec in recommendations:
+                if rec['crop'].lower() == crop_type.lower():
+                    crop_prediction = rec
+                    break
+            
+            if not crop_prediction and recommendations:
+                crop_prediction = recommendations[0]  # Use first recommendation
+            
+            if crop_prediction:
+                # Calculate total production
+                predicted_yield_per_ha = crop_prediction['predicted_yield']
+                total_production = predicted_yield_per_ha * area
+                
+                prediction = {
+                    'crop': crop_prediction['crop'],
+                    'yield_per_hectare': predicted_yield_per_ha,
+                    'total_production': total_production,
+                    'area': area,
+                    'confidence': crop_prediction['recommendation_confidence'],
+                    'suitability_score': crop_prediction['suitability_score']
+                }
+            else:
+                # Fallback prediction
+                prediction = {
+                    'crop': crop_type,
+                    'yield_per_hectare': 3000,
+                    'total_production': 3000 * area,
+                    'area': area,
+                    'confidence': 0.5,
+                    'suitability_score': 0.7
+                }
+            
+            return jsonify({
+                'success': True,
+                'prediction': prediction,
+                'recommendations': recommendations,
+                'location': location,
+                'input_data': processed_soil_data,
+                'timestamp': datetime.now().isoformat(),
+                'model_version': 'v2.0.0-punjab-trained'
+            })
         else:
-            # Use actual ML model
-            prediction = predict_yield_with_model(models['yield_prediction'], features)
-        
-        return jsonify({
-            'success': True,
-            'prediction': prediction,
-            'factors': analyze_yield_factors(features),
-            'recommendations': generate_yield_recommendations(crop_type, features),
-            'timestamp': datetime.now().isoformat(),
-            'model_version': 'v1.0.0'
-        })
+            # Mock yield prediction
+            base_yields = {
+                'wheat': 4500, 'rice': 6000, 'potato': 25000, 'bajra': 2500,
+                'maize': 5500, 'sugarcane': 70000, 'cotton': 500
+            }
+            
+            base_yield = base_yields.get(crop_type.lower(), 4000)
+            predicted_yield = base_yield * np.random.uniform(0.8, 1.2)
+            total_production = predicted_yield * area
+            
+            prediction = {
+                'crop': crop_type,
+                'yield_per_hectare': predicted_yield,
+                'total_production': total_production,
+                'area': area,
+                'confidence': 0.75,
+                'suitability_score': 0.8
+            }
+            
+            return jsonify({
+                'success': True,
+                'prediction': prediction,
+                'recommendations': [],
+                'location': location,
+                'input_data': processed_soil_data,
+                'timestamp': datetime.now().isoformat(),
+                'model_version': 'v2.0.0-mock'
+            })
         
     except Exception as e:
         return jsonify({
@@ -119,182 +218,164 @@ def predict_yield():
             'message': str(e)
         }), 500
 
-def extract_crop_features(soil_data, weather_data):
-    """Extract and normalize features for crop recommendation"""
-    features = {
-        'ph': soil_data.get('ph', 7.0),
-        'nitrogen': soil_data.get('nitrogen', 200),
-        'phosphorus': soil_data.get('phosphorus', 40),
-        'potassium': soil_data.get('potassium', 180),
-        'temperature': weather_data.get('temperature', 25),
-        'humidity': weather_data.get('humidity', 60),
-        'rainfall': weather_data.get('rainfall', 100)
-    }
-    return features
+@app.route('/predict/soil-analysis', methods=['POST'])
+def analyze_soil():
+    """Analyze soil health and provide recommendations"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        soil_data = data.get('soil_data', {})
+        
+        # Prepare soil data
+        processed_soil_data = {
+            'nitrogen': soil_data.get('nitrogen', 150),
+            'phosphorus': soil_data.get('phosphorus', 40),
+            'potassium': soil_data.get('potassium', 100),
+            'soil_type': soil_data.get('soil_type', 'loamy')
+        }
+        
+        if predictor and model_loaded:
+            # Use trained model
+            soil_health = predictor.analyze_soil_health(processed_soil_data)
+            
+            return jsonify({
+                'success': True,
+                'soil_health': soil_health,
+                'npk_levels': {
+                    'nitrogen': processed_soil_data['nitrogen'],
+                    'phosphorus': processed_soil_data['phosphorus'],
+                    'potassium': processed_soil_data['potassium']
+                },
+                'timestamp': datetime.now().isoformat(),
+                'model_version': 'v2.0.0-punjab-trained'
+            })
+        else:
+            # Mock soil analysis
+            total_nutrients = sum([
+                processed_soil_data['nitrogen'],
+                processed_soil_data['phosphorus'],
+                processed_soil_data['potassium']
+            ])
+            
+            if total_nutrients > 400:
+                health_status = 'Good'
+            elif total_nutrients > 250:
+                health_status = 'Average'
+            else:
+                health_status = 'Poor'
+            
+            return jsonify({
+                'success': True,
+                'soil_health': {
+                    'health_status': health_status,
+                    'total_nutrients': total_nutrients,
+                    'recommendations': [
+                        'Regular soil testing recommended',
+                        'Consider organic matter addition',
+                        'Monitor nutrient levels'
+                    ]
+                },
+                'npk_levels': {
+                    'nitrogen': processed_soil_data['nitrogen'],
+                    'phosphorus': processed_soil_data['phosphorus'],
+                    'potassium': processed_soil_data['potassium']
+                },
+                'timestamp': datetime.now().isoformat(),
+                'model_version': 'v2.0.0-mock'
+            })
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Soil analysis failed',
+            'message': str(e)
+        }), 500
 
-def extract_yield_features(crop_type, soil_data, weather_data, area):
-    """Extract features for yield prediction"""
-    features = extract_crop_features(soil_data, weather_data)
-    features.update({
-        'crop_type': crop_type,
-        'area': area,
-        'organic_carbon': soil_data.get('organic_carbon', 0.6),
-        'conductivity': soil_data.get('conductivity', 0.3)
-    })
-    return features
+@app.route('/predict/fertilizer-recommendation', methods=['POST'])
+def recommend_fertilizer():
+    """Get fertilizer recommendations for specific crop and soil"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        crop_type = data.get('crop_type', 'wheat')
+        soil_data = data.get('soil_data', {})
+        
+        # Prepare soil data
+        processed_soil_data = {
+            'nitrogen': soil_data.get('nitrogen', 150),
+            'phosphorus': soil_data.get('phosphorus', 40),
+            'potassium': soil_data.get('potassium', 100)
+        }
+        
+        if predictor and model_loaded:
+            # Use trained model
+            fertilizer_recs = predictor.get_fertilizer_recommendations(processed_soil_data, crop_type)
+            
+            return jsonify({
+                'success': True,
+                'crop_type': crop_type,
+                'fertilizer_recommendations': fertilizer_recs,
+                'soil_levels': processed_soil_data,
+                'timestamp': datetime.now().isoformat(),
+                'model_version': 'v2.0.0-punjab-trained'
+            })
+        else:
+            # Mock fertilizer recommendations
+            mock_recs = []
+            if processed_soil_data['nitrogen'] < 120:
+                mock_recs.append({
+                    'nutrient': 'Nitrogen',
+                    'deficit': 120 - processed_soil_data['nitrogen'],
+                    'fertilizer': 'Urea',
+                    'quantity': (120 - processed_soil_data['nitrogen']) / 0.46,
+                    'unit': 'kg/ha'
+                })
+            
+            return jsonify({
+                'success': True,
+                'crop_type': crop_type,
+                'fertilizer_recommendations': mock_recs,
+                'soil_levels': processed_soil_data,
+                'timestamp': datetime.now().isoformat(),
+                'model_version': 'v2.0.0-mock'
+            })
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Fertilizer recommendation failed',
+            'message': str(e)
+        }), 500
 
-def generate_mock_crop_recommendations(features, location):
-    """Generate mock crop recommendations"""
-    crops = ['wheat', 'rice', 'maize', 'barley', 'sugarcane', 'cotton', 'mustard']
-    
-    # Simple rule-based mock logic
+def generate_mock_crop_recommendations(soil_data, location):
+    """Generate mock crop recommendations for fallback"""
+    crops = ['wheat', 'rice', 'potato', 'bajra']
     recommendations = []
     
-    # Rule 1: pH-based recommendations
-    if features['ph'] > 6.5:
-        suitable_crops = ['wheat', 'maize', 'barley']
-    else:
-        suitable_crops = ['rice', 'cotton']
-    
-    # Rule 2: Temperature-based filtering
-    if features['temperature'] > 30:
-        suitable_crops = [crop for crop in suitable_crops if crop in ['rice', 'cotton', 'sugarcane']]
-    elif features['temperature'] < 20:
-        suitable_crops = [crop for crop in suitable_crops if crop in ['wheat', 'barley']]
-    
-    # Select top 3 recommendations
-    selected_crops = suitable_crops[:3] if len(suitable_crops) >= 3 else suitable_crops + crops[:3-len(suitable_crops)]
-    
-    for i, crop in enumerate(selected_crops):
-        confidence = random.uniform(0.75, 0.95) - (i * 0.05)  # Decreasing confidence
+    for i, crop in enumerate(crops):
+        confidence = np.random.uniform(0.6, 0.9) - (i * 0.05)
+        yield_estimate = np.random.uniform(3000, 5000) - (i * 200)
+        
         recommendations.append({
             'crop': crop,
-            'confidence': round(confidence, 2),
-            'reasons': generate_recommendation_reasons(crop, features)
+            'suitability_score': confidence,
+            'recommendation_confidence': confidence,
+            'predicted_yield': yield_estimate,
+            'recommended': confidence > 0.7
         })
     
-    return recommendations
-
-def generate_mock_yield_prediction(crop_type, features, area):
-    """Generate mock yield prediction"""
-    base_yields = {
-        'wheat': 4500,
-        'rice': 6000,
-        'maize': 5500,
-        'barley': 3500,
-        'sugarcane': 70000,
-        'cotton': 500,
-        'mustard': 1200
-    }
-    
-    base_yield = base_yields.get(crop_type.lower(), 4000)
-    
-    # Apply feature-based modifications
-    ph_factor = 1.0
-    if features['ph'] < 6.0 or features['ph'] > 8.0:
-        ph_factor = 0.9  # Reduce yield for extreme pH
-    
-    temperature_factor = 1.0
-    if crop_type.lower() in ['wheat', 'barley'] and features['temperature'] > 30:
-        temperature_factor = 0.8  # Heat stress
-    elif crop_type.lower() in ['rice', 'sugarcane'] and features['temperature'] < 20:
-        temperature_factor = 0.85  # Cold stress
-    
-    # Random variation
-    random_factor = random.uniform(0.85, 1.15)
-    
-    predicted_yield = int(base_yield * ph_factor * temperature_factor * random_factor)
-    
-    return {
-        'crop_type': crop_type,
-        'predicted_yield': predicted_yield,
-        'unit': 'kg/ha',
-        'area': area,
-        'total_production': predicted_yield * area,
-        'confidence': round(random.uniform(0.70, 0.90), 2)
-    }
-
-def analyze_conditions(features):
-    """Analyze soil and weather conditions"""
-    return {
-        'soil_suitability': calculate_soil_suitability(features),
-        'weather_suitability': calculate_weather_suitability(features),
-        'overall_score': calculate_overall_score(features)
-    }
-
-def calculate_soil_suitability(features):
-    """Calculate soil suitability score (0-100)"""
-    score = 100
-    
-    # pH scoring
-    if 6.0 <= features['ph'] <= 7.5:
-        ph_score = 100
-    elif 5.5 <= features['ph'] < 6.0 or 7.5 < features['ph'] <= 8.0:
-        ph_score = 80
-    else:
-        ph_score = 60
-    
-    # Nutrient scoring (simplified)
-    nutrient_score = min(100, (features['nitrogen'] + features['phosphorus'] + features['potassium']) / 10)
-    
-    return int((ph_score + nutrient_score) / 2)
-
-def calculate_weather_suitability(features):
-    """Calculate weather suitability score (0-100)"""
-    temp_score = 100 if 20 <= features['temperature'] <= 30 else 80
-    humidity_score = 100 if 40 <= features['humidity'] <= 70 else 80
-    return int((temp_score + humidity_score) / 2)
-
-def calculate_overall_score(features):
-    """Calculate overall suitability score"""
-    soil_score = calculate_soil_suitability(features)
-    weather_score = calculate_weather_suitability(features)
-    return int((soil_score + weather_score) / 2)
-
-def analyze_yield_factors(features):
-    """Analyze factors affecting yield"""
-    return {
-        'soil_impact': calculate_soil_suitability(features),
-        'weather_impact': calculate_weather_suitability(features),
-        'management_impact': random.randint(80, 95)  # Mock management factor
-    }
-
-def generate_recommendation_reasons(crop, features):
-    """Generate reasons for crop recommendation"""
-    reasons = []
-    
-    if 6.0 <= features['ph'] <= 7.5:
-        reasons.append(f"Optimal pH level ({features['ph']}) for {crop}")
-    
-    if features['nitrogen'] > 200:
-        reasons.append("Good nitrogen availability in soil")
-    
-    if 20 <= features['temperature'] <= 30:
-        reasons.append("Suitable temperature conditions")
-    
-    reasons.append("Historical performance data supports this crop")
-    
-    return reasons[:3]  # Return max 3 reasons
-
-def generate_yield_recommendations(crop_type, features):
-    """Generate recommendations to improve yield"""
-    recommendations = [
-        "Monitor soil moisture levels regularly",
-        "Apply fertilizers based on soil test results",
-        "Consider weather forecasts for irrigation planning"
-    ]
-    
-    if features['ph'] < 6.0:
-        recommendations.insert(0, "Apply lime to increase soil pH")
-    elif features['ph'] > 8.0:
-        recommendations.insert(0, "Apply gypsum to reduce soil pH")
-    
-    if features['nitrogen'] < 180:
-        recommendations.insert(0, "Increase nitrogen fertilizer application")
-    
-    return recommendations[:4]  # Return max 4 recommendations
+    return sorted(recommendations, key=lambda x: x['suitability_score'], reverse=True)
 
 if __name__ == '__main__':
-    print("Starting Agriculture ML Microservice...")
+    print("🌾 Starting Punjab Agriculture ML Microservice 🌾")
+    
+    # Load models on startup
     load_models()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    # Start Flask app
+    print("🚀 Starting server on http://localhost:5001")
+    app.run(debug=True, host='0.0.0.0', port=5001)

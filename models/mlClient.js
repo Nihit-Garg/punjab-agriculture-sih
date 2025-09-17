@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000';
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
 
 const mlClient = {
   // Get crop recommendation from ML microservice
@@ -23,7 +23,8 @@ const mlClient = {
       console.error('ML Service Error (Crop Recommendation):', error.message);
       
       // If ML service is unavailable, return mock response
-      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || 
+          error.message.includes('timeout') || error.message.includes('ECONNREFUSED')) {
         console.log('ML Service unavailable, returning mock recommendation');
         return mlClient.getMockCropRecommendation(data);
       }
@@ -54,7 +55,8 @@ const mlClient = {
       console.error('ML Service Error (Yield Prediction):', error.message);
       
       // If ML service is unavailable, return mock response
-      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || 
+          error.message.includes('timeout') || error.message.includes('ECONNREFUSED')) {
         console.log('ML Service unavailable, returning mock prediction');
         return mlClient.getMockYieldPrediction(data);
       }

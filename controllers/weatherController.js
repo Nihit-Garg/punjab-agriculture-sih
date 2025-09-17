@@ -1,3 +1,5 @@
+const weatherClient = require('../models/weatherClient');
+
 const weatherController = {
   // GET /api/weather?location=punjab&district=amritsar
   getCurrentWeather: async (req, res) => {
@@ -11,24 +13,12 @@ const weatherController = {
         });
       }
 
-      // Mock weather data (in production, integrate with weather API)
-      const mockWeatherData = {
-        location: location,
-        district: district || 'Not specified',
-        current: {
-          temperature: Math.round(Math.random() * 20 + 15), // 15-35°C
-          humidity: Math.round(Math.random() * 40 + 40), // 40-80%
-          precipitation: Math.round(Math.random() * 10), // 0-10mm
-          wind_speed: Math.round(Math.random() * 15 + 5), // 5-20 km/h
-          conditions: ['Clear', 'Partly Cloudy', 'Cloudy', 'Light Rain'][Math.floor(Math.random() * 4)]
-        },
-        timestamp: new Date().toISOString(),
-        last_updated: new Date(Date.now() - Math.random() * 3600000).toISOString() // Random time within last hour
-      };
+      // Get real weather data from OpenWeatherMap API
+      const weatherData = await weatherClient.getCurrentWeather(location, district);
 
       res.json({
         success: true,
-        data: mockWeatherData,
+        data: weatherData,
         timestamp: new Date().toISOString()
       });
 
@@ -44,7 +34,7 @@ const weatherController = {
   // GET /api/weather/forecast?location=punjab&days=7
   getWeatherForecast: async (req, res) => {
     try {
-      const { location, days = 7 } = req.query;
+      const { location, days = 5 } = req.query;
       
       if (!location) {
         return res.status(400).json({
@@ -53,32 +43,14 @@ const weatherController = {
         });
       }
 
-      const numDays = Math.min(parseInt(days) || 7, 14); // Max 14 days
-      const forecast = [];
-
-      for (let i = 0; i < numDays; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() + i);
-        
-        forecast.push({
-          date: date.toISOString().split('T')[0],
-          temperature: {
-            min: Math.round(Math.random() * 10 + 10), // 10-20°C
-            max: Math.round(Math.random() * 15 + 25)  // 25-40°C
-          },
-          humidity: Math.round(Math.random() * 30 + 45), // 45-75%
-          precipitation_chance: Math.round(Math.random() * 100), // 0-100%
-          conditions: ['Clear', 'Partly Cloudy', 'Cloudy', 'Rain', 'Thunderstorm'][Math.floor(Math.random() * 5)]
-        });
-      }
+      const numDays = Math.min(parseInt(days) || 5, 5); // OpenWeather free plan: max 5 days
+      
+      // Get real weather forecast from OpenWeatherMap API
+      const forecastData = await weatherClient.getWeatherForecast(location, numDays);
 
       res.json({
         success: true,
-        data: {
-          location: location,
-          forecast: forecast,
-          days_requested: numDays
-        },
+        data: forecastData,
         timestamp: new Date().toISOString()
       });
 
@@ -103,21 +75,8 @@ const weatherController = {
         });
       }
 
-      // Mock historical weather data
-      const historicalData = {
-        location: location,
-        date: date,
-        weather: {
-          temperature: {
-            min: Math.round(Math.random() * 10 + 5),  // 5-15°C
-            max: Math.round(Math.random() * 20 + 20), // 20-40°C
-            avg: Math.round(Math.random() * 15 + 15)  // 15-30°C
-          },
-          humidity: Math.round(Math.random() * 40 + 40), // 40-80%
-          precipitation: Math.round(Math.random() * 20), // 0-20mm
-          conditions: ['Clear', 'Partly Cloudy', 'Cloudy', 'Rain'][Math.floor(Math.random() * 4)]
-        }
-      };
+      // Get historical weather data (uses mock data as historical requires paid plan)
+      const historicalData = await weatherClient.getHistoricalWeather(location, date);
 
       res.json({
         success: true,
@@ -129,6 +88,26 @@ const weatherController = {
       console.error('Error in getHistoricalWeather:', error);
       res.status(500).json({
         error: 'Failed to get historical weather data',
+        message: error.message
+      });
+    }
+  },
+
+  // GET /api/weather/health - Check weather API status
+  getWeatherAPIHealth: async (req, res) => {
+    try {
+      const healthStatus = await weatherClient.checkWeatherAPIHealth();
+      
+      res.json({
+        success: true,
+        data: healthStatus,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Error in getWeatherAPIHealth:', error);
+      res.status(500).json({
+        error: 'Failed to check weather API health',
         message: error.message
       });
     }
