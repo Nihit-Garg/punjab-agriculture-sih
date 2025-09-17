@@ -29,7 +29,7 @@ Location-based agricultural advisory platform providing real-time weather data, 
 # 2. Connect Railway/Render to GitHub repo
 # 3. Set environment variables:
 MONGODB_URI=your_atlas_connection_string
-OPENWEATHER_API_KEY=52812f82fa9fd96feae7f11aabeedbc6
+OPENWEATHER_API_KEY=your_openweathermap_api_key_here
 NODE_ENV=production
 PORT=8000
 

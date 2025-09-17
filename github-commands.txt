@@ -1,0 +1,12 @@
+# After creating GitHub repository, run these commands:
+
+cd /Users/nihitgarg/projects/agri-backend
+
+# Add your GitHub repository URL (replace YOUR_USERNAME)
+git remote add origin  https://github.com/Nihit-Garg/punjab-agriculture-sih.git
+
+# Push your code to GitHub
+git branch -M main
+git push -u origin main
+
+# That's it! Your code will be on GitHub ready for deployment
